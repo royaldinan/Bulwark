@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bulwark palette (AGENTS.md Design) -->
+    <color name="bulwark_white">#FFFFFFFF</color>
+    <color name="bulwark_navy">#FF0B1B4D</color>
+    <color name="bulwark_surface">#FFF3F4F9</color>
+    <color name="bulwark_selected_card">#FFECEBFF</color>
+    <color name="bulwark_line">#FFE3E6F0</color>
+    <color name="bulwark_gradient_start">#FF2456E8</color>
+    <color name="bulwark_gradient_end">#FF6A3FE0</color>
+
+    <color name="ic_launcher_background">#FF0B1B4D</color>
+</resources>

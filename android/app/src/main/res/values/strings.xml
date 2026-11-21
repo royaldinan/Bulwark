@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Bulwark</string>
+
+    <!-- Overlay warning (PRD Fase 2). Indonesian, no "VPN". -->
+    <string name="overlay_title">Link berisiko tinggi</string>
+    <string name="overlay_hint">Domain ini ditandai berbahaya di daftar publik. Bulwark menyarankan kembali ke aman.</string>
+    <string name="overlay_stay_safe">Kembali ke aman</string>
+    <string name="overlay_proceed">Lanjutkan dengan risiko sendiri</string>
+
+    <!-- Foreground notification for the local connection filter. -->
+    <string name="notif_channel_name">Perlindungan Bulwark</string>
+    <string name="notif_title">Bulwark aktif</string>
+    <string name="notif_text">Filter koneksi lokal sedang berjalan</string>
+</resources>
