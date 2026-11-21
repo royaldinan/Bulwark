@@ -44,6 +44,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".overlay.BlockWarningActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:noHistory="true"
+            android:taskAffinity="id.bulwark.warning"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+
         <!-- Local connection filter. The system binds to it through BIND_VPN_SERVICE.
              VERIFY: foregroundServiceType for VpnService on Android 14+. -->
         <service

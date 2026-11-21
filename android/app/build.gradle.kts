@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,20 +7,19 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Single source of truth for the Mediation API base URL (PRD task 1).
-// Resolved from a Gradle property or env var so the deployed Railway URL is not baked in code.
-// VERIFY: the real Railway URL is set by the backend owner (do not invent endpoints).
-// .invalid is a reserved TLD used here as an obvious, overridable placeholder.
+// Single source of truth for the Mediation API base URL. Every client call (check domain,
+// check apk, report) goes through BuildConfig.API_BASE_URL. Overridable via Gradle property / env.
 val apiBaseUrl: String = (project.findProperty("bulwark.apiBaseUrl") as String?)
     ?: System.getenv("BULWARK_API_BASE_URL")
-    ?: "https://bulwark-api.example.invalid"
+    ?: "https://bulwark-production-d29c2d86.up.railway.app"
 
-// VERIFY: POST /v1/report requires the shared token (PRD "Keputusan teknis" 7). Set via Gradle
-// property / BULWARK_API_SHARED_TOKEN; empty means the header is simply omitted. Embedding a shared
-// token in the APK is a demo compromise, not a production auth scheme.
-val apiSharedToken: String = (project.findProperty("bulwark.apiSharedToken") as String?)
-    ?: System.getenv("BULWARK_API_SHARED_TOKEN")
-    ?: ""
+// Shared token for POST /v1/report (PRD "Keputusan teknis" 7). Never hardcoded: read from the
+// gitignored local.properties key `API_SHARED_TOKEN`. Missing key -> empty (header is omitted).
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val apiSharedToken: String = localProperties.getProperty("API_SHARED_TOKEN") ?: ""
 
 android {
     namespace = "id.bulwark"
@@ -70,6 +71,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.activity:activity-compose:1.9.3")
 
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))

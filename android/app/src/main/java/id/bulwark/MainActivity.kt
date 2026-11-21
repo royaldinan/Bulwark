@@ -3,25 +3,22 @@ package id.bulwark
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
+import androidx.activity.enableEdgeToEdge
+import id.bulwark.ui.BulwarkRoot
 import id.bulwark.ui.theme.BulwarkTheme
 
-/**
- * Minimal launcher used by the task 1 skeleton to prove the theme installs and renders.
- * The real navigation (onboarding / Beranda / Lapor) belongs to later tasks.
- */
+/** Hosts the app: onboarding (izin) / Beranda / Lapor wired to the real Room-backed repository. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val app = application as BulwarkApp
         setContent {
             BulwarkTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {}
+                BulwarkRoot(
+                    repository = app.repository,
+                    apkGuard = app.apkGuard,
+                )
             }
         }
     }
