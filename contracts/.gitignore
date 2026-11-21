@@ -1,0 +1,8 @@
+# Contract test suite runs for one hardhat local network only.
+node_modules/
+artifacts/
+cache/
+coverage/
+coverage.json
+typechain-types/
+.env
