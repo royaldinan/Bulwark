@@ -3,16 +3,12 @@ package id.bulwark.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 
-// Bulwark is a light-only brand: white surfaces, navy text, gradient accents.
-private val BulwarkLightColors = lightColorScheme(
-    primary = BulwarkGradientStart,
-    onPrimary = Color.White,
-    primaryContainer = BulwarkSelectedCard,
-    onPrimaryContainer = BulwarkNavy,
+private val BulwarkLightColorScheme = lightColorScheme(
+    primary = BulwarkNavy,
+    onPrimary = BulwarkWhite,
     secondary = BulwarkGradientEnd,
-    onSecondary = Color.White,
+    onSecondary = BulwarkWhite,
     background = BulwarkWhite,
     onBackground = BulwarkNavy,
     surface = BulwarkWhite,
@@ -20,13 +16,16 @@ private val BulwarkLightColors = lightColorScheme(
     surfaceVariant = BulwarkSurface,
     onSurfaceVariant = BulwarkNavy,
     outline = BulwarkLine,
+    error = BulwarkError,
+    onError = BulwarkWhite,
 )
 
 @Composable
 fun BulwarkTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = BulwarkLightColors,
+        colorScheme = BulwarkLightColorScheme,
         typography = BulwarkTypography,
+        shapes = BulwarkShapes,
         content = content,
     )
 }
