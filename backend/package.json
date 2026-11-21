@@ -1,0 +1,19 @@
+{
+  "name": "bulwark-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bulwark mediation API: reads the public Amoy registry, checks Safe Browsing, and writes reports on behalf of users.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "express": "^4.21.2"
+  }
+}
