@@ -6,3 +6,6 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+
+# Local Kotlin compiler sessions (never commit)
+.kotlin/
