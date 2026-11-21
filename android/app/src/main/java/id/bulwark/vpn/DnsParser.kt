@@ -13,6 +13,7 @@ object DnsParser {
     private const val FLAG_RD = 0x0100
     private const val FLAG_RA = 0x0080
     private const val RCODE_NXDOMAIN = 0x0003
+    private const val RCODE_SERVFAIL = 0x0002
     private const val RCODE_MASK = 0x000F
     private const val OPCODE_MASK = 0x7800
 
@@ -65,7 +66,12 @@ object DnsParser {
      * Build an NXDOMAIN response for [query] with the same transaction id and question section.
      * Used to make a flagged domain fail to resolve inside the tunnel.
      */
-    fun buildNxdomainResponse(query: ByteArray): ByteArray? {
+    fun buildNxdomainResponse(query: ByteArray): ByteArray? = buildErrorResponse(query, RCODE_NXDOMAIN)
+
+    /** Build a SERVFAIL response so a failed lookup is never silently dropped. */
+    fun buildServfailResponse(query: ByteArray): ByteArray? = buildErrorResponse(query, RCODE_SERVFAIL)
+
+    private fun buildErrorResponse(query: ByteArray, rcode: Int): ByteArray? {
         val parsed = parseQuery(query) ?: return null
         val response = ByteArray(HEADER_LENGTH + parsed.questionLength)
 
@@ -75,7 +81,7 @@ object DnsParser {
 
         val opcode = parsed.flags and OPCODE_MASK
         val recursionDesired = parsed.flags and FLAG_RD
-        val flags = FLAG_QR or opcode or FLAG_AA or recursionDesired or FLAG_RA or RCODE_NXDOMAIN
+        val flags = FLAG_QR or opcode or FLAG_AA or recursionDesired or FLAG_RA or rcode
         response[2] = ((flags ushr 8) and 0xFF).toByte()
         response[3] = (flags and 0xFF).toByte()
 

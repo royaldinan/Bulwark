@@ -84,6 +84,7 @@ fun ReportRoute(
         domainInput = domain,
         onDomainInputChange = { domain = it },
         apkName = pickedApkName,
+        apkHash = pickedApkHash,
         onPickApk = onPickApk,
         state = ReportUiState(
             canSubmit = canSubmit,
@@ -118,6 +119,7 @@ fun ReportScreen(
     state: ReportUiState,
     onSubmit: () -> Unit,
     onOpenTransaction: (String) -> Unit,
+    apkHash: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -136,6 +138,19 @@ fun ReportScreen(
             label = { if (it == ReportKind.DOMAIN) "Domain" else "APK" },
         )
         Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = when (kind) {
+                ReportKind.DOMAIN ->
+                    "Masukkan domain yang kamu tahu berbahaya, tanpa https://. Domain ini akan dicatat permanen di daftar publik dan diblokir di semua perangkat yang memakai Bulwark."
+
+                ReportKind.APK ->
+                    "Pilih file APK berbahaya. Yang dikirim hanya sidik jarinya (hash), bukan file-nya."
+            },
+            color = BulwarkTextSecondary,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(12.dp))
 
         when (kind) {
             ReportKind.DOMAIN -> {
@@ -165,11 +180,21 @@ fun ReportScreen(
                         .padding(20.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = apkName ?: "Pilih file APK",
-                        color = if (apkName == null) BulwarkTextSecondary else BulwarkNavy,
-                        fontSize = 15.sp,
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = apkName ?: "Pilih file APK",
+                            color = if (apkName == null) BulwarkTextSecondary else BulwarkNavy,
+                            fontSize = 15.sp,
+                        )
+                        if (apkName != null && !apkHash.isNullOrBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "SHA-256 ${apkHash.take(12)}…${apkHash.takeLast(8)}",
+                                color = BulwarkTextSecondary,
+                                fontSize = 11.sp,
+                            )
+                        }
+                    }
                 }
             }
         }

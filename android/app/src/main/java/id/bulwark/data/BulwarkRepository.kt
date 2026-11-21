@@ -1,8 +1,13 @@
 package id.bulwark.data
 
+import id.bulwark.data.entity.ApkCacheEntity
+import id.bulwark.data.entity.ApkEventEntity
+import id.bulwark.data.entity.AppStateEntity
 import id.bulwark.data.entity.DomainCacheEntity
 import id.bulwark.data.entity.LinkEventEntity
 import id.bulwark.data.entity.ReportEntity
+import id.bulwark.data.model.ApkAction
+import id.bulwark.data.model.ApkDecision
 import id.bulwark.data.model.DomainDecision
 import id.bulwark.data.model.LinkAction
 import id.bulwark.data.model.MediationGateway
@@ -10,6 +15,7 @@ import id.bulwark.data.model.ReportKind
 import id.bulwark.data.model.ReportStatus
 import id.bulwark.data.model.Verdict
 import id.bulwark.data.model.VerdictSource
+import java.util.Locale
 
 /**
  * Single entry point for verdicts and counters.
@@ -27,6 +33,9 @@ class BulwarkRepository(
     private val domainCacheDao = database.domainCacheDao()
     private val linkEventDao = database.linkEventDao()
     private val reportDao = database.reportDao()
+    private val apkCacheDao = database.apkCacheDao()
+    private val apkEventDao = database.apkEventDao()
+    private val appStateDao = database.appStateDao()
 
     suspend fun checkDomain(domain: String): DomainDecision {
         val normalized = DomainHasher.normalize(domain)
@@ -58,6 +67,7 @@ class BulwarkRepository(
                     expiresAt = now + ttlMillis(remoteVerdict.verdict),
                 ),
             )
+            touchLastSync(now)
             return DomainDecision(
                 domain = normalized,
                 domainHash = hash,
@@ -68,7 +78,18 @@ class BulwarkRepository(
             )
         }
 
-        // No verdict source available: treat as unknown, but do not cache a guess.
+        // Remote unavailable or HTTP error (logged by MediationApi). Cache UNKNOWN briefly so a
+        // repeated query hits the cache instead of hammering the API. Never longer than 30 s.
+        domainCacheDao.upsert(
+            DomainCacheEntity(
+                domainHash = hash,
+                domain = normalized,
+                verdict = Verdict.UNKNOWN.wire,
+                source = VerdictSource.NONE.wire,
+                checkedAt = now,
+                expiresAt = now + SHORT_TTL_MILLIS,
+            ),
+        )
         return DomainDecision(
             domain = normalized,
             domainHash = hash,
@@ -92,6 +113,63 @@ class BulwarkRepository(
     }
 
     suspend fun countLinks(action: LinkAction): Int = linkEventDao.countByAction(action.wire)
+
+    /**
+     * Look up an APK verdict: local cache first, then the remote source. Mirrors [checkDomain] so the
+     * quarantine step never guesses (AGENTS hard rule 1).
+     */
+    suspend fun checkApk(sha256: String): ApkDecision {
+        val hash = sha256.trim().lowercase(Locale.ROOT)
+        val now = clock()
+
+        val cached = apkCacheDao.find(hash)
+        if (cached != null && cached.expiresAt > now) {
+            return ApkDecision(hash, Verdict.fromWire(cached.verdict), VerdictSource.CACHE, fresh = false)
+        }
+
+        val remoteVerdict = gateway?.checkApk(hash)
+        if (remoteVerdict != null) {
+            apkCacheDao.upsert(
+                ApkCacheEntity(
+                    sha256 = hash,
+                    verdict = remoteVerdict.verdict.wire,
+                    source = remoteVerdict.source.wire,
+                    checkedAt = now,
+                    expiresAt = now + ttlMillis(remoteVerdict.verdict),
+                ),
+            )
+            touchLastSync(now)
+            return ApkDecision(hash, remoteVerdict.verdict, remoteVerdict.source, fresh = true)
+        }
+
+        return ApkDecision(hash, Verdict.UNKNOWN, VerdictSource.NONE, fresh = true)
+    }
+
+    suspend fun recordApkEvent(
+        sha256: String,
+        fileName: String,
+        originalPath: String,
+        quarantinePath: String?,
+        action: ApkAction,
+    ) {
+        apkEventDao.insert(
+            ApkEventEntity(
+                sha256 = sha256,
+                fileName = fileName,
+                originalPath = originalPath,
+                quarantinePath = quarantinePath,
+                action = action.wire,
+                createdAt = clock(),
+            ),
+        )
+    }
+
+    suspend fun countApks(action: ApkAction): Int = apkEventDao.countByAction(action.wire)
+
+    /** Record the time the device last synced with the public list (Beranda "status pembaruan"). */
+    private suspend fun touchLastSync(now: Long) {
+        appStateDao.upsert(AppStateEntity(KEY_LAST_SYNC, now.toString()))
+    }
 
     /**
      * Report a domain to the public registry through the Mediation API. The row is written first as
@@ -136,5 +214,8 @@ class BulwarkRepository(
     companion object {
         const val SHORT_TTL_MILLIS = 30_000L
         const val MALICIOUS_TTL_MILLIS = 24 * 60 * 60 * 1000L
+
+        /** `app_state` keys. */
+        const val KEY_LAST_SYNC = "last_sync_at"
     }
 }

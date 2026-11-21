@@ -33,4 +33,13 @@ class DomainHasherTest {
         assertEquals("a379a6f6eeafb9a5", DomainHasher.prefixOf("example.com"))
         assertEquals(DomainHasher.prefix8(hash), DomainHasher.prefixOf("example.com"))
     }
+
+    @Test
+    fun registryTestDomainMatchesKnownSha256AndNormalizesTrailingDot() {
+        val expected = "bd567f3c6619d19120aa34c1b98aebcc18450492754fc1ebad31be06b7c1dd1d"
+        assertEquals(expected, DomainHasher.domainHash("bulwark-simulasi-scam.netlify.app"))
+        // Uppercase + trailing dot must normalize to the exact same hash.
+        assertEquals(expected, DomainHasher.domainHash("Bulwark-Simulasi-Scam.Netlify.App."))
+        assertEquals("bd567f3c6619d191", DomainHasher.prefixOf("bulwark-simulasi-scam.netlify.app"))
+    }
 }
