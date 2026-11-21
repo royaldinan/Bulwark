@@ -41,12 +41,13 @@ import java.util.concurrent.TimeoutException
  * DNS-only local connection filter.
  *
  * PRD "Keputusan teknis" 2: the tunnel only routes the virtual DNS address. Blocked domains are
- * answered NXDOMAIN; every other query is forwarded to the real resolver through a `protect()`ed
- * socket. There is no full TCP forwarding on purpose.
+ * answered NXDOMAIN; genuine SAFE/UNKNOWN verdicts are forwarded through a `protect()`ed socket,
+ * while unavailable verdicts produce SERVFAIL. There is no full TCP forwarding on purpose.
  *
  * Reliability rules for this path:
- * - A verdict lookup must never stall DNS: wait at most [VERDICT_TIMEOUT_MILLIS], then treat as
- *   unknown and forward. The lookup keeps running in the background to fill the cache.
+ * - A verdict attempt waits at most [VERDICT_TIMEOUT_MILLIS]. The processor permits one retry and
+ *   answers SERVFAIL instead of forwarding if no verdict is available. A timed-out lookup keeps
+ *   running in the background to fill the cache.
  * - Forwarding uses a short timeout, one retry with a backup upstream, and always answers SERVFAIL
  *   when it fails (never silently drops the query).
  * - Block side effects (link_event + overlay) are deduped per domain via [BlockGate]; a temporary
@@ -66,7 +67,7 @@ class BulwarkVpnService : VpnService() {
 
     private val allowList = DomainAllowList(ALLOWLIST_TTL_MILLIS)
     private val blockGate = BlockGate(BLOCK_COOLDOWN_MILLIS)
-    private val inFlightVerdicts = ConcurrentHashMap<String, CompletableFuture<DomainDecision>>()
+    private val inFlightVerdicts = ConcurrentHashMap<String, CompletableFuture<DomainDecision?>>()
     private val verdictExecutor = Executors.newFixedThreadPool(VERDICT_THREADS)
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -260,9 +261,9 @@ class BulwarkVpnService : VpnService() {
     }
 
     /**
-     * Resolve a verdict without letting a slow API stall DNS. Waits at most
-     * [VERDICT_TIMEOUT_MILLIS]; the background lookup keeps running (de-duplicated per domain) so
-     * the cache warms up for the next query.
+     * Resolve one bounded verdict attempt. A null result means no genuine verdict is available;
+     * [DnsQueryProcessor] decides whether to retry or answer SERVFAIL. The background lookup keeps
+     * running (de-duplicated per domain) so the cache can warm up for the next query.
      */
     private fun resolveVerdict(domain: String): DomainDecision? {
         val started = SystemClock.elapsedRealtime()
@@ -278,20 +279,27 @@ class BulwarkVpnService : VpnService() {
 
         return try {
             val decision = future.get(VERDICT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
-            Log.i(
-                DNS_TAG,
-                "verdict domain=$domain verdict=${decision.verdict} source=${decision.source} " +
-                    "cacheHit=${!decision.fresh} ms=${SystemClock.elapsedRealtime() - started}",
-            )
+            if (decision == null) {
+                Log.w(DNS_TAG, "verdict unavailable domain=$domain")
+            } else {
+                Log.i(
+                    DNS_TAG,
+                    "verdict domain=$domain verdict=${decision.verdict} source=${decision.source} " +
+                        "cacheHit=${!decision.fresh} ms=${SystemClock.elapsedRealtime() - started}",
+                )
+            }
             decision
         } catch (e: TimeoutException) {
             Log.w(
                 DNS_TAG,
-                "verdict timeout domain=$domain after ${VERDICT_TIMEOUT_MILLIS}ms -> unknown (forward)",
+                "verdict timeout domain=$domain after ${VERDICT_TIMEOUT_MILLIS}ms -> retry/SERVFAIL",
             )
             null
         } catch (e: Exception) {
-            Log.w(DNS_TAG, "verdict error domain=$domain ${e.javaClass.simpleName}: ${e.message} -> unknown")
+            Log.w(
+                DNS_TAG,
+                "verdict error domain=$domain ${e.javaClass.simpleName}: ${e.message} -> retry/SERVFAIL",
+            )
             null
         }
     }

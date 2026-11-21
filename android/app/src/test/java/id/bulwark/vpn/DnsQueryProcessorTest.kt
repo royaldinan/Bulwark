@@ -35,6 +35,15 @@ class DnsQueryProcessorTest {
         fresh = false,
     )
 
+    private fun remote(verdict: Verdict) = DomainDecision(
+        domain = "example.com",
+        domainHash = "a379a6f6eeafb9a5",
+        prefix = "a379a6f6",
+        verdict = verdict,
+        source = VerdictSource.REGISTRY,
+        fresh = true,
+    )
+
     @Test
     fun maliciousVerdictYieldsNxdomainAndRecordsEvent() {
         val calls = mutableListOf<String>()
@@ -136,10 +145,48 @@ class DnsQueryProcessorTest {
     }
 
     @Test
+    fun safeVerdictIsForwarded() {
+        val answer = bytes(0xDE, 0xAD, 0xBE, 0xEF)
+        var attempts = 0
+        val processor = DnsQueryProcessor(
+            resolveVerdict = {
+                attempts++
+                remote(Verdict.SAFE)
+            },
+            forward = { answer },
+            log = {},
+        )
+
+        val response = processor.process(query)
+
+        assertEquals(1, attempts)
+        assertArrayEquals(answer, response)
+    }
+
+    @Test
+    fun backendUnknownVerdictIsForwardedWithoutRetry() {
+        val answer = bytes(0xDE, 0xAD, 0xBE, 0xEF)
+        var attempts = 0
+        val processor = DnsQueryProcessor(
+            resolveVerdict = {
+                attempts++
+                remote(Verdict.UNKNOWN)
+            },
+            forward = { answer },
+            log = {},
+        )
+
+        val response = processor.process(query)
+
+        assertEquals("an official UNKNOWN verdict must not be retried", 1, attempts)
+        assertArrayEquals(answer, response)
+    }
+
+    @Test
     fun forwardFailureYieldsServfailInsteadOfDropping() {
         val processor = DnsQueryProcessor(
-            resolveVerdict = { null }, // unknown / verdict timeout
-            forward = { null }, // forwarding failed after retries
+            resolveVerdict = { remote(Verdict.SAFE) },
+            forward = { null }, // forwarding failed after upstream retries
             log = {},
         )
 
@@ -147,5 +194,49 @@ class DnsQueryProcessorTest {
 
         assertNotNull(response)
         assertEquals(2, DnsParser.responseCode(response!!) ?: -1) // SERVFAIL, never silent
+    }
+
+    @Test
+    fun retryCanRecoverWithBackendVerdict() {
+        val answer = bytes(0xDE, 0xAD, 0xBE, 0xEF)
+        val verdicts = ArrayDeque<DomainDecision?>(listOf(null, remote(Verdict.SAFE)))
+        var attempts = 0
+        val processor = DnsQueryProcessor(
+            resolveVerdict = {
+                attempts++
+                verdicts.removeFirst()
+            },
+            forward = { answer },
+            log = {},
+        )
+
+        val response = processor.process(query)
+
+        assertEquals(2, attempts)
+        assertArrayEquals(answer, response)
+    }
+
+    @Test
+    fun unavailableVerdictRetriesOnceThenReturnsServfailWithoutForwarding() {
+        var attempts = 0
+        var forwarded = false
+        val processor = DnsQueryProcessor(
+            resolveVerdict = {
+                attempts++
+                null
+            },
+            forward = {
+                forwarded = true
+                bytes(0xDE, 0xAD, 0xBE, 0xEF)
+            },
+            log = {},
+        )
+
+        val response = processor.process(query)
+
+        assertEquals(2, attempts)
+        assertFalse("an unavailable verdict must fail closed", forwarded)
+        assertNotNull(response)
+        assertEquals(2, DnsParser.responseCode(response!!) ?: -1)
     }
 }

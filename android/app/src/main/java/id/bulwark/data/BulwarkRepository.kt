@@ -11,6 +11,7 @@ import id.bulwark.data.model.ApkDecision
 import id.bulwark.data.model.DomainDecision
 import id.bulwark.data.model.LinkAction
 import id.bulwark.data.model.MediationGateway
+import id.bulwark.data.model.ReportAlreadyListedException
 import id.bulwark.data.model.ReportKind
 import id.bulwark.data.model.ReportStatus
 import id.bulwark.data.model.Verdict
@@ -37,7 +38,7 @@ class BulwarkRepository(
     private val apkEventDao = database.apkEventDao()
     private val appStateDao = database.appStateDao()
 
-    suspend fun checkDomain(domain: String): DomainDecision {
+    suspend fun checkDomain(domain: String): DomainDecision? {
         val normalized = DomainHasher.normalize(domain)
         val hash = DomainHasher.sha256Hex(normalized)
         val prefix = DomainHasher.prefix8(hash)
@@ -55,47 +56,24 @@ class BulwarkRepository(
             )
         }
 
-        val remoteVerdict = gateway?.checkDomain(normalized, hash, prefix)
-        if (remoteVerdict != null) {
-            domainCacheDao.upsert(
-                DomainCacheEntity(
-                    domainHash = hash,
-                    domain = normalized,
-                    verdict = remoteVerdict.verdict.wire,
-                    source = remoteVerdict.source.wire,
-                    checkedAt = now,
-                    expiresAt = now + ttlMillis(remoteVerdict.verdict),
-                ),
-            )
-            touchLastSync(now)
-            return DomainDecision(
-                domain = normalized,
-                domainHash = hash,
-                prefix = prefix,
-                verdict = remoteVerdict.verdict,
-                source = remoteVerdict.source,
-                fresh = true,
-            )
-        }
-
-        // Remote unavailable or HTTP error (logged by MediationApi). Cache UNKNOWN briefly so a
-        // repeated query hits the cache instead of hammering the API. Never longer than 30 s.
+        val remoteVerdict = gateway?.checkDomain(normalized, hash, prefix) ?: return null
         domainCacheDao.upsert(
             DomainCacheEntity(
                 domainHash = hash,
                 domain = normalized,
-                verdict = Verdict.UNKNOWN.wire,
-                source = VerdictSource.NONE.wire,
+                verdict = remoteVerdict.verdict.wire,
+                source = remoteVerdict.source.wire,
                 checkedAt = now,
-                expiresAt = now + SHORT_TTL_MILLIS,
+                expiresAt = now + ttlMillis(remoteVerdict.verdict),
             ),
         )
+        touchLastSync(now)
         return DomainDecision(
             domain = normalized,
             domainHash = hash,
             prefix = prefix,
-            verdict = Verdict.UNKNOWN,
-            source = VerdictSource.NONE,
+            verdict = remoteVerdict.verdict,
+            source = remoteVerdict.source,
             fresh = true,
         )
     }
@@ -195,12 +173,14 @@ class BulwarkRepository(
                 createdAt = clock(),
             ),
         )
-        val txHash = try {
-            gateway?.report(kind, hash)
+        val (txHash, status) = try {
+            val result = gateway?.report(kind, hash)
+            result to if (result != null) ReportStatus.SENT else ReportStatus.FAILED
+        } catch (_: ReportAlreadyListedException) {
+            null to ReportStatus.ALREADY_LISTED
         } catch (e: Exception) {
-            null
+            null to ReportStatus.FAILED
         }
-        val status = if (txHash != null) ReportStatus.SENT else ReportStatus.FAILED
         reportDao.updateResult(id, txHash, status.wire)
         return reportDao.findById(id) ?: error("report row $id disappeared")
     }
