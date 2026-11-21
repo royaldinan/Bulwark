@@ -70,6 +70,9 @@ enum class ReportStatus(val wire: String) {
 interface MediationGateway {
     suspend fun checkDomain(domain: String, domainHash: String, prefix: String): RemoteVerdict?
 
+    /** Check a full SHA-256 APK hash. Matches `POST /v1/check/apk` `{ sha256 }`. */
+    suspend fun checkApk(sha256: String): RemoteVerdict?
+
     /** Submits a report; returns the real transaction hash, or null on failure. */
     suspend fun report(kind: ReportKind, hash: String): String?
 }
