@@ -1,11 +1,17 @@
 <resources>
     <string name="app_name">Bulwark</string>
 
-    <!-- Overlay warning (PRD Fase 2). Indonesian, no "VPN". -->
+    <!-- Overlay warning (PRD Fase 2). Indonesian copy; avoid the prohibited network term. -->
     <string name="overlay_title">Link berisiko tinggi</string>
     <string name="overlay_hint">Domain ini ditandai berbahaya di daftar publik. Bulwark menyarankan kembali ke aman.</string>
     <string name="overlay_stay_safe">Kembali ke aman</string>
     <string name="overlay_proceed">Lanjutkan dengan risiko sendiri</string>
+    <string name="warning_explanation">Situs ini ditandai berbahaya di daftar publik Bulwark.</string>
+
+    <!-- Overlay warning for a quarantined APK. -->
+    <string name="overlay_file_title">File berisiko tinggi</string>
+    <string name="overlay_file_hint">File ini ditandai berbahaya. Bulwark memindahkannya ke karantina agar tidak bisa dipasang.</string>
+    <string name="overlay_file_dismiss">Mengerti</string>
 
     <!-- Foreground notification for the local connection filter. -->
     <string name="notif_channel_name">Perlindungan Bulwark</string>

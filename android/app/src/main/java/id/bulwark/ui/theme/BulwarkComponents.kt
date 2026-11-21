@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -246,7 +247,13 @@ fun BulwarkOptionCard(
         Spacer(Modifier.width(4.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, color = BulwarkNavy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    color = BulwarkNavy,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 if (selected && badge != null) {
                     Spacer(Modifier.width(8.dp))
                     Box(
@@ -255,17 +262,31 @@ fun BulwarkOptionCard(
                             .background(BulwarkBadge)
                             .padding(horizontal = 10.dp, vertical = 3.dp),
                     ) {
-                        Text(badge, color = BulwarkWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = badge,
+                            color = BulwarkWhite,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
+                }
+                if (value != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = value,
+                        color = BulwarkNavy,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
             if (subtitle.isNotEmpty()) {
                 Text(subtitle, color = BulwarkTextSecondary, fontSize = 13.sp)
             }
-        }
-        if (value != null) {
-            Spacer(Modifier.width(8.dp))
-            Text(value, color = BulwarkNavy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -335,6 +356,7 @@ fun BulwarkBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .background(BulwarkWhite)
+            .navigationBarsPadding()
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
