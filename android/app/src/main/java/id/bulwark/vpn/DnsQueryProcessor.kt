@@ -6,12 +6,11 @@ import id.bulwark.data.model.Verdict
 /**
  * Pure DNS decision core (unit-testable without Android/Room).
  *
- * Verdict/forwarding logic is unchanged from before. Added on top of it:
- * - an in-memory allowlist ("Lanjutkan dengan risiko sendiri") turns a MALICIOUS verdict into a
- *   normal forward for up to 5 minutes;
- * - [BlockGate] is the single gate for overlay + event + counter: [onBlock] fires only when the
- *   gate says the warning must be shown, and the service records the event only after the overlay
- *   is actually on screen.
+ * Verdict handling is fail-closed: an unavailable verdict gets one bounded retry, then SERVFAIL.
+ * A real MALICIOUS verdict is blocked unless an in-memory allowlist ("Lanjutkan dengan risiko
+ * sendiri") permits forwarding for up to 5 minutes. [BlockGate] is the single gate for overlay +
+ * event + counter: [onBlock] fires only when the gate says the warning must be shown, and the
+ * service records the event only after the overlay is actually on screen.
  */
 class DnsQueryProcessor(
     private val resolveVerdict: (domain: String) -> DomainDecision?,
@@ -25,9 +24,19 @@ class DnsQueryProcessor(
 
     fun process(queryPayload: ByteArray): ByteArray? {
         val query = DnsParser.parseQuery(queryPayload) ?: return null
-        val decision = resolveVerdict(query.domain)
+        var decision: DomainDecision? = null
+        for (attempt in 1..MAX_VERDICT_ATTEMPTS) {
+            decision = resolveVerdict(query.domain)
+            if (decision != null) break
+            log("verdict unavailable domain=${query.domain} attempt=$attempt")
+        }
 
-        if (decision != null && decision.verdict == Verdict.MALICIOUS) {
+        if (decision == null) {
+            log("verdict unavailable after retry domain=${query.domain} -> SERVFAIL")
+            return DnsParser.buildServfailResponse(queryPayload)
+        }
+
+        if (decision.verdict == Verdict.MALICIOUS) {
             if (allowList.isAllowed(decision.domainHash, now())) {
                 log("allowlisted domain=${decision.domain} -> forward")
             } else {
@@ -53,5 +62,9 @@ class DnsQueryProcessor(
 
         log("forward failed domain=${query.domain} -> SERVFAIL")
         return DnsParser.buildServfailResponse(queryPayload)
+    }
+
+    private companion object {
+        const val MAX_VERDICT_ATTEMPTS = 2
     }
 }

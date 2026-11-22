@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hadiah Gratis</string>
+    <string name="simulation_icon_description">Ikon informasi aplikasi simulasi</string>
+    <string name="simulation_badge">APK SIMULASI • TIDAK BERBAHAYA</string>
+    <string name="simulation_headline">Ini hanya simulasi.</string>
+    <string name="simulation_message">Aplikasi ini dibuat untuk pengujian keamanan dan tidak berbahaya. Tidak ada hadiah yang perlu diklaim.</string>
+    <string name="safety_message">Aplikasi ini tidak meminta izin berbahaya, tidak mengakses internet, tidak mengambil data, dan tidak menjalankan layanan latar belakang.</string>
+    <string name="closing_message">Anda dapat menutup atau menghapus aplikasi ini kapan saja.</string>
+</resources>

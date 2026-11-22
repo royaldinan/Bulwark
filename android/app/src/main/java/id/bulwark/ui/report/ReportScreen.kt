@@ -48,7 +48,22 @@ data class ReportUiState(
     val submitting: Boolean = false,
     val txHash: String? = null,
     val error: String? = null,
-)
+    val info: String? = null,
+) {
+    companion object {
+        fun fromOutcome(
+            outcome: ReportOutcome?,
+            canSubmit: Boolean = false,
+            submitting: Boolean = false,
+        ): ReportUiState = ReportUiState(
+            canSubmit = canSubmit,
+            submitting = submitting,
+            txHash = (outcome as? ReportOutcome.Sent)?.txHash,
+            error = (outcome as? ReportOutcome.Failed)?.message,
+            info = if (outcome == ReportOutcome.AlreadyListed) "Sudah terdaftar" else null,
+        )
+    }
+}
 
 private val DOMAIN_REGEX = Regex("^([a-z0-9](-?[a-z0-9])*\\.)+[a-z]{2,}$")
 
@@ -86,11 +101,10 @@ fun ReportRoute(
         apkName = pickedApkName,
         apkHash = pickedApkHash,
         onPickApk = onPickApk,
-        state = ReportUiState(
+        state = ReportUiState.fromOutcome(
+            outcome = outcome,
             canSubmit = canSubmit,
             submitting = submitting,
-            txHash = (outcome as? ReportOutcome.Sent)?.txHash,
-            error = (outcome as? ReportOutcome.Failed)?.message,
         ),
         onSubmit = {
             val value = when (kind) {
@@ -209,6 +223,11 @@ fun ReportScreen(
         state.error?.let { message ->
             Spacer(Modifier.height(12.dp))
             Text(message, color = BulwarkError, fontSize = 13.sp)
+        }
+
+        state.info?.let { message ->
+            Spacer(Modifier.height(12.dp))
+            Text(message, color = BulwarkNavy, fontSize = 13.sp)
         }
 
         state.txHash?.let { txHash ->

@@ -4,6 +4,7 @@ import android.util.Log
 import id.bulwark.BuildConfig
 import id.bulwark.data.model.MediationGateway
 import id.bulwark.data.model.RemoteVerdict
+import id.bulwark.data.model.ReportAlreadyListedException
 import id.bulwark.data.model.ReportKind
 import id.bulwark.data.model.Verdict
 import id.bulwark.data.model.VerdictSource
@@ -80,10 +81,11 @@ class MediationApi(
         // Backend rejects a bare hash: it validates `^0x[0-9a-f]{64}$` for both kinds. The app used
         // to send 64 hex without the prefix, so every report failed with HTTP 400 invalid_hash.
         val hashHex = if (hash.startsWith("0x") || hash.startsWith("0X")) hash else "0x$hash"
-        val body = JSONObject()
-            .put("kind", kind.wire)
-            .put("hash", hashHex)
+        val body = """{"kind":"${kind.wire}","hash":"$hashHex"}"""
         val response = execute("POST", "/v1/report", body, authenticated = true)
+        if (response.code == 409 && response.body?.contains(ALREADY_LISTED_ERROR) == true) {
+            throw ReportAlreadyListedException()
+        }
         val json = parseBody(response)
         val txHash = json?.optString("txHash")?.takeIf { it.isNotEmpty() }
         Log.i(
@@ -135,12 +137,26 @@ class MediationApi(
         path: String,
         body: JSONObject?,
         authenticated: Boolean,
+    ): HttpResponse = executeRequest(method, path, body?.toString(), authenticated)
+
+    private fun execute(
+        method: String,
+        path: String,
+        body: String,
+        authenticated: Boolean,
+    ): HttpResponse = executeRequest(method, path, body, authenticated)
+
+    private fun executeRequest(
+        method: String,
+        path: String,
+        body: String?,
+        authenticated: Boolean,
     ): HttpResponse {
         val connection = open(method, path, authenticated)
         return try {
             if (body != null) {
                 connection.doOutput = true
-                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
@@ -176,5 +192,6 @@ class MediationApi(
     companion object {
         private const val TAG = "BulwarkDns"
         private const val DEFAULT_TIMEOUT_MILLIS = 10_000
+        private val ALREADY_LISTED_ERROR = Regex("\\\"error\\\"\\s*:\\s*\\\"already_listed\\\"")
     }
 }

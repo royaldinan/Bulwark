@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Bulwark"
 include(":app")
+include(":fixture")

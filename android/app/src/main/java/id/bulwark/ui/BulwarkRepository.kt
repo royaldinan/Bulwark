@@ -13,6 +13,7 @@ data class HomeStats(
 
 sealed interface ReportOutcome {
     data class Sent(val txHash: String) : ReportOutcome
+    object AlreadyListed : ReportOutcome
     data class Failed(val message: String) : ReportOutcome
 }
 

@@ -61,7 +61,11 @@ enum class ReportStatus(val wire: String) {
     PENDING("pending"),
     SENT("sent"),
     FAILED("failed"),
+    ALREADY_LISTED("already_listed"),
 }
+
+/** The mediation API confirmed that this exact report is already registered. */
+class ReportAlreadyListedException : Exception("already_listed")
 
 /**
  * Port used by the tunnel and the report flow. Implemented by `MediationApi` (task 4). It is
