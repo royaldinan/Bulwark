@@ -14,6 +14,7 @@ const TX = "0x" + "11".repeat(32);
 
 function fakeRegistry(opts = {}) {
   const flagged = new Set((opts.flagged || []).map((p) => p.toLowerCase()));
+  const listed = new Set((opts.listed || []).map((h) => h.toLowerCase()));
   const calls = { report: [] };
   const unavailable = () => {
     const err = new Error("not configured");
@@ -27,9 +28,16 @@ function fakeRegistry(opts = {}) {
       if (opts.fail) throw new Error("boom");
       return flagged.has(prefix.toLowerCase());
     },
+    async isFlagged(hash) {
+      if (opts.unavailable) throw unavailable();
+      if (opts.fail) throw new Error("boom");
+      return listed.has(hash.toLowerCase());
+    },
     async report(hash, kind) {
       if (opts.unavailable) throw unavailable();
       if (opts.fail) throw new Error("boom");
+      if (listed.has(hash.toLowerCase())) throw new Error("AlreadyReported");
+      if (opts.reportError) throw opts.reportError;
       calls.report.push({ hash, kind });
       return { txHash: opts.txHash || TX };
     },
@@ -246,6 +254,60 @@ test("POST /v1/report: valid token -> txHash", async () => {
   assert.equal(body.kind, "domain");
   assert.equal(body.chainId, 80002);
   assert.deepEqual(registry.calls.report.at(-1), { hash: HASH, kind: 1 });
+});
+
+test("POST /v1/report: duplicate domain -> 409 already_listed", async () => {
+  const app = createApp({ registry: fakeRegistry({ listed: [HASH] }), safeBrowsing: fakeSafeBrowsing() });
+  const { server: s, base: b } = await start(app);
+  try {
+    const { status, body } = await post(
+      b,
+      "/v1/report",
+      { kind: "domain", hash: HASH },
+      { "x-api-token": "test-token" }
+    );
+    assert.equal(status, 409);
+    assert.deepEqual(body, { error: "already_listed" });
+  } finally {
+    s.close();
+  }
+});
+
+test("POST /v1/report: duplicate APK -> 409 already_listed", async () => {
+  const app = createApp({ registry: fakeRegistry({ listed: [APK_HASH] }), safeBrowsing: fakeSafeBrowsing() });
+  const { server: s, base: b } = await start(app);
+  try {
+    const { status, body } = await post(
+      b,
+      "/v1/report",
+      { kind: "apk", hash: APK_HASH },
+      { "x-api-token": "test-token" }
+    );
+    assert.equal(status, 409);
+    assert.deepEqual(body, { error: "already_listed" });
+  } finally {
+    s.close();
+  }
+});
+
+test("POST /v1/report: non-duplicate RPC failure -> 500 registry_write_failed", async () => {
+  const app = createApp({
+    registry: fakeRegistry({ reportError: new Error("RPC unavailable") }),
+    safeBrowsing: fakeSafeBrowsing(),
+  });
+  const { server: s, base: b } = await start(app);
+  try {
+    const { status, body } = await post(
+      b,
+      "/v1/report",
+      { kind: "domain", hash: HASH },
+      { "x-api-token": "test-token" }
+    );
+    assert.equal(status, 500);
+    assert.deepEqual(body, { error: "registry_write_failed" });
+  } finally {
+    s.close();
+  }
 });
 
 test("POST /v1/report: invalid kind -> 400", async () => {

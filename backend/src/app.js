@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const { rateLimit } = require("./ratelimit");
 const { isHex8, isHex32 } = require("./validate");
 const { prefix8 } = require("./hash");
+const { createOpenPhishFeed } = require("./services/openphish");
 
 const KIND_NUMBER = { domain: 1, apk: 2 };
 const CHAIN_ID = 80002;
@@ -42,9 +43,10 @@ async function registryLookup(registry, prefix) {
   }
 }
 
-function createApp({ registry, safeBrowsing }) {
+function createApp({ registry, safeBrowsing, feed, startFeed = false }) {
   if (!registry) throw new Error("createApp requires a registry");
   if (!safeBrowsing) throw new Error("createApp requires a safeBrowsing");
+  if (startFeed) void feed.start();
 
   const app = express();
   app.disable("x-powered-by");
@@ -60,6 +62,12 @@ function createApp({ registry, safeBrowsing }) {
       chainId: CHAIN_ID,
       network: "amoy",
       contractAddress: process.env.REGISTRY_ADDRESS || null,
+      feed: feed ? feed.health() : {
+        source: "openphish",
+        entries: 0,
+        updatedAt: null,
+        lastError: null,
+      },
     });
   });
 
@@ -86,6 +94,10 @@ function createApp({ registry, safeBrowsing }) {
 
     if (flagged === true) {
       return res.json({ verdict: "malicious", source: "registry" });
+    }
+
+    if (feed && hash && feed.hasHash(hash.toLowerCase())) {
+      return res.json({ verdict: "malicious", source: "feed" });
     }
 
     let sb = null;
@@ -144,14 +156,18 @@ function createApp({ registry, safeBrowsing }) {
         .json({ error: "invalid_hash", detail: "hash must be 0x + 64 hex chars (32 bytes)" });
     }
 
+    const normalizedHash = hash.toLowerCase();
     try {
-      const { txHash } = await registry.report(hash.toLowerCase(), KIND_NUMBER[kind]);
-      return res.json({ txHash, kind, hash: hash.toLowerCase(), chainId: CHAIN_ID });
+      if (await registry.isFlagged(normalizedHash)) {
+        return res.status(409).json({ error: "already_listed" });
+      }
+      const { txHash } = await registry.report(normalizedHash, KIND_NUMBER[kind]);
+      return res.json({ txHash, kind, hash: normalizedHash, chainId: CHAIN_ID });
     } catch (err) {
       if (err && err.code === "REGISTRY_NOT_CONFIGURED") {
         return res.status(503).json({ error: "registry_not_configured" });
       }
-      return res.status(502).json({ error: "report_failed" });
+      return res.status(500).json({ error: "registry_write_failed" });
     }
   });
 
@@ -167,4 +183,4 @@ function createApp({ registry, safeBrowsing }) {
   return app;
 }
 
-module.exports = { createApp, KIND_NUMBER };
+module.exports = { createApp, createOpenPhishFeed, KIND_NUMBER };
