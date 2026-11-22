@@ -17,4 +17,7 @@ interface LinkEventDao {
 
     @Query("SELECT COUNT(*) FROM link_event WHERE action = :action")
     fun observeCountByAction(action: String): Flow<Int>
+
+    @Query("SELECT * FROM link_event ORDER BY created_at DESC, id DESC LIMIT 5")
+    fun observeRecent(): Flow<List<LinkEventEntity>>
 }
