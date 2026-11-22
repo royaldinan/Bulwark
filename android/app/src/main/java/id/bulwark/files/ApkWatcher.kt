@@ -18,7 +18,13 @@ class ApkWatcher(
     fun start() {
         if (running) return
         running = true
-        directories.filter { it.isDirectory }.forEach { directory ->
+        directories.forEach { directory ->
+            if (!directory.isDirectory && !directory.mkdirs() && !directory.isDirectory) return@forEach
+            directory.listFiles()?.forEach { file ->
+                if (file.isFile && file.name.endsWith(APK_EXTENSION, ignoreCase = true)) {
+                    onApkFinished(file)
+                }
+            }
             val observer = object : FileObserver(directory.absolutePath, MASK) {
                 override fun onEvent(event: Int, path: String?) {
                     val name = path ?: return
@@ -53,7 +59,7 @@ class ApkWatcher(
                 File(root, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Documents"),
                 File(root, "WhatsApp/Media/WhatsApp Documents"),
             )
-            return candidates.filter { it.isDirectory }
+            return candidates
         }
     }
 }

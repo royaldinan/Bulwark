@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="canvas">#F7F7F2</color>
+    <color name="accent">#16745B</color>
+    <color name="text_primary">#17221E</color>
+    <color name="text_secondary">#53605B</color>
+</resources>
