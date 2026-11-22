@@ -1,33 +1,45 @@
-# Team and workflow
+# Team and engineering workflow
 
 ## Contributors
 
 | GitHub | Person | Area |
 | --- | --- | --- |
-| [`royaldinan`](https://github.com/royaldinan) | Ferdinand Manurung (team lead) | `android/`: VpnService, DNS parser and decision core, Room cache, warning activity, on-device testing |
-| [`anzuky1`](https://github.com/anzuky1) | Abyan Nur Zaky | `backend/` and `contracts/`: `Registry.sol`, Hardhat deploy, Express API, Railway |
-| [`MarioGess`](https://github.com/MarioGess) | Mario Gabriel Santoso | `android/`: Compose UI (theme, onboarding, home, report), FileObserver, SHA-256, quarantine |
+| [`royaldinan`](https://github.com/royaldinan) | Ferdinand Manurung (team lead) | Android protection core, DNS decisions, Room cache, warning experience, on-device verification |
+| [`anzuky1`](https://github.com/anzuky1) | Abyan Nur Zaky | `Registry.sol`, Hardhat deployment, Express mediation API, OpenPhish integration, Railway |
+| [`MarioGess`](https://github.com/MarioGess) | Mario Gabriel Santoso | Compose UI, onboarding, home and report flows, APK monitoring and quarantine |
 
-Each person commits under their own GitHub account. Every module has an author who can explain it in Q&A.
+Each module has an owner who can explain its design and verification during Q&A.
 
-## Branching
+## Development workflow
 
-- `main` always builds and always runs.
-- Feature work happens on a branch: `feat/<area>`, fixes on `fix/<area>`.
-- Before pushing, rebase on `origin/main`. No force pushes, no history rewriting.
-- Commit messages follow `type(scope): short summary`, for example `feat(vpn): parse DNS query` or `fix(api): read PORT from env`.
+- `main` is the deployable, reviewable branch.
+- Feature work uses `feat/<area>` and fixes use `fix/<area>`.
+- Changes are submitted through focused pull requests. Existing history is preserved; updates are added through new commits and merge commits.
+- Commit messages follow `type(scope): short summary`, for example `feat(feed): index OpenPhish domains` or `fix(vpn): retry unavailable verdicts`.
+- User-visible values come from Room, the mediation API, or the registry—not hardcoded demo results.
 
 ## Build and test
 
-- `cd android && ./gradlew testDebugUnitTest assembleDebug` — 41 unit tests cover the DNS decision core, the block gate and hashing.
-- `cd backend && npm start` — the API reads `PORT`, `AMOY_RPC_URL`, `REGISTRY_ADDRESS`, `API_SHARED_TOKEN` and `PRIVATE_KEY` from the environment.
-- `cd contracts && npx hardhat test` — registry append and lookup behaviour.
+```bash
+cd android
+./gradlew testDebugUnitTest assembleDebug
 
-Secrets never enter the repository: `local.properties`, `.env` and keys stay out of git, and only `.env.example` with variable names is committed.
+cd ../backend
+npm test
 
-## Fixed facts
+cd ../contracts
+npx hardhat test
+```
+
+The current Android suite contains 60 JVM tests and the backend suite contains 33 tests. The Android build requires JDK 21 and Android SDK 36.
+
+Backend configuration is read from `PORT`, `AMOY_RPC_URL`, `REGISTRY_ADDRESS`, `API_SHARED_TOKEN`, and `PRIVATE_KEY`. Android report configuration is read from the gitignored `android/local.properties`.
+
+Secrets never enter the repository: `local.properties`, `.env`, private keys, and tokens stay out of Git. Only variable names and placeholders belong in example files and documentation.
+
+## Deployed facts
 
 - Repository: <https://github.com/royaldinan/Bulwark>
-- Registry chain: Polygon Amoy, chain ID 80002
-- Contract: `0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe`
-- API: `https://bulwark-production-d29c2d86.up.railway.app`
+- Registry chain: Polygon Amoy, chain ID `80002`
+- Contract: [`0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe`](https://amoy.polygonscan.com/address/0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe)
+- API: <https://bulwark-production-d29c2d86.up.railway.app>

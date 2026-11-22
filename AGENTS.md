@@ -26,7 +26,7 @@ Android app (Kotlin/Compose) that blocks scam links and malicious APKs on-device
 ## Android notes
 - The tunnel is DNS-only: route only the virtual DNS address into the TUN, answer blocked domains with NXDOMAIN, forward safe queries through a `protect()`ed socket.
 - Exclude our own package from the tunnel (`addDisallowedApplication`).
-- Hash everything with SHA-256, use an 8-byte prefix for lookups. Normalize domains first (lowercase, no trailing dot).
+- Hash domains and APKs with SHA-256. Normalize domains first (lowercase, no trailing dot). Domain lookups send the 8-byte prefix and full hash so the backend can require an exact match for both registry and OpenPhish feed verdicts.
 - Blocked domains: one decision per domain from `BlockGate`, one warning activity, one `link_event`, then a 15-second cooldown measured from when the warning closes.
 - The backend expects `0x` + 64 hex characters; the app normalises hashes before every call.
 

@@ -1,162 +1,202 @@
-# Bulwark
+<div align="center">
 
-**Stop scams before the tap.**
+# 🛡️ Bulwark
+### Protection before the tap becomes a compromise.
 
-Bulwark is an Android shield that closes scam links at the DNS layer and moves known-malicious APKs into quarantine before they can be installed. Verdicts live in a public, append-only registry on Polygon Amoy, so a report from one phone protects every phone that runs Bulwark.
+**An Android security companion that warns users about known scam links, quarantines known-malicious APK downloads, and turns new reports into shared threat intelligence.**
 
-Hacksphere 2026 · Team *Aku Mau Skin Kuronami Vandal*
+Built for **Hacksphere 2026** · Team *Aku Mau Skin Kuronami Vandal* · Android 13+ · Kotlin · Node.js · Polygon Amoy
 
----
+[Download the app](https://github.com/royaldinan/Bulwark/releases/latest/download/bulwark-demo.apk) · [Architecture](#architecture) · [Live API](https://bulwark-production-d29c2d86.up.railway.app/v1/health) · [Registry contract](https://amoy.polygonscan.com/address/0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe)
 
-## Download the demo build
-
-[**bulwark-demo.apk**](https://github.com/royaldinan/Bulwark/releases/latest/download/bulwark-demo.apk) · Android 8.0+ · `id.bulwark`
-
-Install it, open the app once, and grant the three permissions it asks for: VPN, display over other apps, and all-files access. The tunnel starts immediately; the home screen shows *Perlindungan aktif*.
-
-This is a debug-signed demo build pointed at the live Railway API. Source builds are described under [Quick start](#quick-start).
+</div>
 
 ---
 
-## The problem
+## Why Bulwark
+
+A single WhatsApp message can move a victim from a familiar chat to a fake giveaway, a credential-harvesting page, or an APK download in seconds. Centralized blocklists protect a browser; Bulwark brings the decision closer to the person and lets every user strengthen the same shared registry.
 
 | Signal | Value |
 | --- | --- |
 | Reported scam losses in Indonesia (14 months) | **IDR 9.1T**, under 2% recovered |
-| Scam links that arrive through chat apps | **89%** via WhatsApp |
-| People who feel confident they can spot a scam, yet were scammed | **31%** |
-| Adults who met a scam in the last 12 months | **66%** |
-
-Blocklists exist, but they act *after* someone reports. The tap happens first — and an APK installed once can read SMS OTPs in seconds. Bulwark checks at the moment a connection or a file arrives, not when the user becomes suspicious.
+| Scam links arriving through chat apps | **89%** via WhatsApp |
+| Adults who encountered a scam in the last 12 months | **66%** |
 
 Sources: OJK IASC (2026), GASA State of Scams Indonesia 2025, PANDI IDADX Q4 2025, APJII 2025.
 
----
+## What the MVP delivers
 
-## How it works
+| Protection | User experience | Enforcement |
+| --- | --- | --- |
+| **Scam-link protection** | A full-screen warning appears over the current app. The user can return to safety or make an informed choice to continue. | A local DNS filter answers known-malicious domains with NXDOMAIN and deduplicates repeated warnings. |
+| **APK download quarantine** | A clear warning identifies the threat without technical jargon. | A known-malicious APK is removed from the watched download location and moved to app-private quarantine so the installer cannot open the original file. |
+| **Expanded threat coverage** | Protection benefits from intelligence beyond reports made by Bulwark users. | Registry lookups are complemented by an off-chain OpenPhish domain index using exact SHA-256 matches. |
+| **Resilient verdict handling** | A temporary network problem is not silently presented as a safe result. | An unavailable verdict receives one bounded retry, then fails safely; an official UNKNOWN verdict remains distinct. |
+| **Useful report feedback** | Duplicate submissions show **“Sudah terdaftar”**, not a misleading connection error. | The API returns a dedicated `409 already_listed` outcome while preserving real registry errors. |
+| **Recent protection activity** | The home screen shows the latest link blocks and APK quarantines with their source and time. | Events come from Room on the device, not hardcoded dashboard data. |
 
-**1 · Detect**
-A local `VpnService` tunnel receives every DNS lookup on the device. A `FileObserver` watches the Download folder and the WhatsApp documents folder; each new `.apk` is hashed with streaming SHA-256.
+## Product preview
 
-**2 · Decide**
-The device cache answers in milliseconds. On a miss the app asks the registry through the mediation API. Only a 16-hex prefix of the hash leaves the phone; unknown domains are forwarded to the upstream resolver untouched.
-
-**3 · Act**
-- **Link:** no DNS answer is returned, so the page never loads. A full-screen warning names the domain and offers *stay safe* or *continue at your own risk* (a 5-minute pass, then the gate blocks again).
-- **APK:** a malicious package is moved out of the folder into the app's private quarantine, so it can never be installed.
-- **Report:** a domain or APK hash submitted from the app becomes a public on-chain entry with a real transaction hash.
-
----
+<p align="center">
+  <img src="docs/screens/home.png" width="46%" alt="Bulwark home and protection status" />
+  <img src="docs/screens/warning.png" width="46%" alt="Bulwark malicious link warning" />
+</p>
 
 ## Architecture
 
-![Bulwark architecture: DNS interception and APK watcher feeding on-device decisions, the registry API and Polygon Amoy](docs/architecture.png)
+![Bulwark system architecture](docs/architecture.png)
 
-**Android** — Kotlin, Jetpack Compose, Room, `VpnService`, `FileObserver`, streaming SHA-256.
-**Backend** — Node.js/Express mediation API in front of the registry, in-process cache, request validation, rate limiting.
-**Contracts** — `Registry.sol`: append-only verdicts, owner-gated writes, no delete path.
+### From a link to a decision
 
----
+1. An app resolves a domain through Bulwark’s local, permission-based DNS filter.
+2. The domain is normalized and hashed with SHA-256. The device checks its Room cache before making a network request.
+3. The mediation API checks the shared Polygon Amoy registry. On a registry miss, it checks the current OpenPhish domain-hash index.
+4. A known-malicious verdict returns a warning and NXDOMAIN. A verified verdict is cached for subsequent lookups.
+5. A transient unavailable verdict is retried once; it is never cached as UNKNOWN.
 
-## On a real phone
+### From an APK download to quarantine
 
-<table>
-<tr>
-<td width="50%"><img src="docs/screens/home.png" alt="Bulwark home: protection active, blocked links and quarantined APKs"><br><sub>Home: protection active, live counters.</sub></td>
-<td width="50%"><img src="docs/screens/warning.png" alt="Bulwark warning: high-risk link with the domain name"><br><sub>Warning: the domain is named before the page loads.</sub></td>
-</tr>
-</table>
+1. `ApkWatcher` observes supported shared download folders, including folders created after protection starts.
+2. New and already-present APKs are hashed locally with SHA-256.
+3. `ApkGuard` checks the hash against the shared registry and caches the result.
+4. A known-malicious file is moved into app-private quarantine and recorded in Room. The user sees a warning and the event appears under **Aktivitas terakhir**.
 
-Every claim below was executed on an Infinix X6853 (Android 14) with the tunnel connected (`VPN CONNECTED extra: VPN:id.bulwark`); each result is backed by a screen dump **and** a logcat line or a database row.
+### Shared intelligence, without putting every feed entry on-chain
 
-| What | Result |
+The Polygon registry stores community-reported domain and APK hashes. OpenPhish is imported into an off-chain exact-hash index and refreshed every 15 minutes. This keeps lookups fast while retaining an append-only, independently verifiable reporting trail.
+
+The phone sends hashed identifiers to the mediation API—not browsing history or APK contents. Link events, APK events, cache entries, and recent activity remain in the device’s Room database.
+
+## Live, verifiable evidence
+
+| Check | Result |
 | --- | --- |
-| Scam link in Chrome | Blocked at DNS (`NXDOMAIN`), full-screen warning, `link_event` saved, counter +1 |
-| Scam link tapped inside WhatsApp | Same block, warning opens over the chat, `link_event` saved |
-| Repeat visits | Warning returns on every new visit; 15-second cooldown after closing, never extended by suppressed queries |
-| Malicious APK in Download | Moved to quarantine, warning shown, `apk_event` recorded, counter +1 |
-| Malicious APK in the WhatsApp documents folder | Same path, quarantined before it could be opened |
-| APK picker | Picks the file, shows its SHA-256, sends only the hash |
-| Report from the app | `POST /v1/report` → `200` + real txHash `0x9603e19c40de89d28a39db04208c66c912c886a34dd2df90d76d2730d929754d` |
-| Control | `google.com` and normal traffic keep working with no warning |
-| Unit tests | 41 tests, 0 failures (`./gradlew testDebugUnitTest`) |
+| Android automated suite | **60 JVM tests passing** across DNS decisions, retry behavior, reporting, recent activity, and APK watching |
+| Backend automated suite | **33 tests passing** across registry mediation, OpenPhish ingestion, health reporting, and duplicate handling |
+| Android build | **assembleDebug — BUILD SUCCESSFUL** |
+| WhatsApp link scenario | Scam simulation link received in WhatsApp resolves through Bulwark and opens the warning experience |
+| Chrome APK scenario | Owner-confirmed on Infinix Note 40: the downloaded fixture was quarantined and the Android installer did not open |
+| OpenPhish integration | Live API returned `malicious / feed` for an OpenPhish domain that was previously `unknown / none` in Bulwark |
+| Duplicate report | Live API returns **HTTP 409** with `{"error":"already_listed"}` |
+| On-chain proof | [Verified Polygon Amoy transaction](https://amoy.polygonscan.com/tx/0x9603e19c40de89d28a39db04208c66c912c886a34dd2df90d76d2730d929754d) |
+| APK fixture registration | [Verified Polygon Amoy transaction](https://amoy.polygonscan.com/tx/0xb2ce6f3be64fb652b5913b4db80a2057232dcd6e7847385290f15446046a9764) |
 
----
+## Try the evaluation build
 
-## Quick start
+**Requirements:** Android 13 or newer. Enable Chrome’s standard network mode and allow Bulwark’s local connection filter, warning display, and file-access permissions during onboarding.
 
-### Android app
+1. Download **[bulwark-demo.apk](https://github.com/royaldinan/Bulwark/releases/latest/download/bulwark-demo.apk)** from the latest release.
+2. Complete the three-step onboarding and activate protection.
+3. Send the safe simulation page to yourself on WhatsApp: <https://bulwark-simulasi-scam.netlify.app>.
+4. Tap the link and observe the warning. The site is a controlled simulation, not a real scam.
+5. For APK quarantine, send the harmless **[HadiahGratis.apk](https://github.com/royaldinan/Bulwark/releases/latest/download/HadiahGratis.apk)** link through WhatsApp, open it in Chrome, and download it.
+6. Open **Aktivitas terakhir** in Bulwark to inspect the recorded protection event.
 
-```bash
-# JDK 21 and an Android SDK are required (Gradle 8.9 does not run on JDK 25)
-cd android
-echo "sdk.dir=/path/to/Android/Sdk" > local.properties
-echo "API_SHARED_TOKEN=<token from the backend operator>" >> local.properties
-./gradlew testDebugUnitTest assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n id.bulwark/.MainActivity
+The fixture is a harmless, permission-free application with package ID `id.bulwark.fixture.hadiah`. Its SHA-256 is intentionally registered as malicious solely to exercise the protection flow:
+
+```text
+9ab8df25f7e455500bab400399434972f3bfa74652e1df641a8df92938f590ef
 ```
 
-Grant the three permissions Bulwark asks for (VPN, display over other apps, all-files access), then open the app once so the tunnel starts. Turn Chrome's *Secure DNS* off and make sure no other VPN is active.
+## Run locally
+
+### Android
+
+Requirements: **JDK 21**, Android SDK 36.
+
+Create the gitignored `android/local.properties`:
+
+```properties
+sdk.dir=C\:\Users\<you>\AppData\Local\Android\Sdk
+API_BASE_URL=https://bulwark-production-d29c2d86.up.railway.app
+API_SHARED_TOKEN=<report-token>
+```
+
+Then build and test:
+
+```bash
+cd android
+./gradlew testDebugUnitTest assembleDebug
+```
+
+The APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ### Backend
 
 ```bash
 cd backend
-cp .env.example .env      # PORT, AMOY_RPC_URL, REGISTRY_ADDRESS, API_SHARED_TOKEN, PRIVATE_KEY
+cp .env.example .env
+# Fill AMOY_RPC_URL, REGISTRY_ADDRESS, API_SHARED_TOKEN and PRIVATE_KEY.
 npm install
-npm start
+npm test
+npm run dev
 ```
 
-Live deployment: `https://bulwark-production-d29c2d86.up.railway.app`
+Health endpoint: <https://bulwark-production-d29c2d86.up.railway.app/v1/health>. Its `feed` object reports the provider, entry count, last refresh, and any refresh error.
 
-### Contracts
+### Smart contract
 
 ```bash
 cd contracts
+cp .env.example .env
 npm install
 npx hardhat test
-node scripts/deploy.js     # deploys Registry.sol to Polygon Amoy (80002)
 ```
-
----
 
 ## API
 
-| Method | Path | Body | Notes |
+Base URL: `https://bulwark-production-d29c2d86.up.railway.app`
+
+| Method | Endpoint | Request body | Purpose |
 | --- | --- | --- | --- |
-| `GET` | `/v1/health` | — | `{ok, chainId, network, contractAddress}` |
-| `POST` | `/v1/check/domain` | `{"prefix":"0x<16 hex>","hash":"0x<64 hex>"}` | `verdict`, `source`, `txHash?` |
-| `POST` | `/v1/check/apk` | `{"prefix":"0x<16 hex>","sha256":"0x<64 hex>"}` | `verdict`, `source` |
-| `POST` | `/v1/report` | `{"kind":"domain"\|"apk","hash":"0x<64 hex>"}` | requires `x-api-token`; returns `txHash` |
+| `GET` | `/v1/health` | — | API, registry, and OpenPhish feed health |
+| `POST` | `/v1/check/domain` | `{"prefix":"0x…16 hex","hash":"0x…64 hex"}` | Exact domain verdict from registry or feed |
+| `POST` | `/v1/check/apk` | `{"sha256":"0x…64 hex"}` | APK SHA-256 verdict |
+| `POST` | `/v1/report` | `{"kind":"domain" or "apk","hash":"0x…64 hex"}` + `x-api-token` | Append a report and return its real `txHash` |
 
-**Registry contract:** `0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe` on Polygon Amoy (chain 80002).
-
----
-
-## Repository layout
-
-```
-android/    Kotlin app: VPN tunnel, DNS decision core, warning activity, APK guard, Compose UI
-backend/    Express mediation API in front of the registry
-contracts/  Registry.sol, Hardhat config and Amoy deploy script
-docs/       Architecture diagram, screenshots, product notes, API contract
+```bash
+curl https://bulwark-production-d29c2d86.up.railway.app/v1/health
 ```
 
----
+## On-chain registry
+
+| Item | Value |
+| --- | --- |
+| Contract | [`Registry.sol`](contracts/contracts/Registry.sol) |
+| Address | [`0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe`](https://amoy.polygonscan.com/address/0xbdf4a4db5C00f2172435940efD8f460ff8f15EEe) |
+| Network | Polygon Amoy · chain ID `80002` |
+| Write path | Android → Railway API → Amoy transaction receipt |
+| Domain read path | Room cache → Railway API → Amoy registry → OpenPhish exact-hash index |
+
+## Repository map
+
+```text
+android/                 Kotlin · Jetpack Compose · Room · DNS filtering · APK quarantine
+  app/src/test/          JVM regression suites
+  fixture/               Harmless APK quarantine fixture
+backend/                 Express mediation API · OpenPhish index · registry writes
+contracts/               Solidity ThreatRegistry · Hardhat tests · deployment scripts
+docs/                    Architecture · product requirements · team · real screenshots
+```
 
 ## Team
 
-| Person | Focus |
+| Contributor | Area |
 | --- | --- |
-| **Ferdinand Manurung** ([`royaldinan`](https://github.com/royaldinan)) | Android core — VPN tunnel, DNS gate, on-device testing |
-| **Abyan Nur Zaky** ([`anzuky1`](https://github.com/anzuky1)) | Backend mediation API and Polygon Amoy contracts |
-| **Mario Gabriel Santoso** ([`MarioGess`](https://github.com/MarioGess)) | Compose UI, file watching, APK quarantine |
+| [Ferdinand Manurung](https://github.com/royaldinan) | Team lead · Android protection core · DNS decisions · on-device verification |
+| [Abyan Nur Zaky](https://github.com/anzuky1) | Backend · smart contract · Railway · Polygon Amoy integration |
+| [Mario Gabriel Santoso](https://github.com/MarioGess) | Compose UI · onboarding · APK monitoring and quarantine experience |
 
----
+See [docs/TEAM.md](docs/TEAM.md) for engineering conventions and [docs/PRD.md](docs/PRD.md) for product requirements.
 
 ## License
 
 [MIT](LICENSE) © 2026 Ferdinand Manurung, Abyan Nur Zaky, Mario Gabriel Santoso
 
-Hacksphere 2026 · Polygon Amoy (chain 80002) · Railway deployment
+---
+
+<div align="center">
+<strong>Bulwark — shared intelligence. Local action. A safer next tap.</strong><br/>
+Built for Hacksphere 2026.
+</div>
