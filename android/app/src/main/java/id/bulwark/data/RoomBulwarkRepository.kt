@@ -61,10 +61,10 @@ class RoomBulwarkRepository(
         }
 
         val txHash = row.txHash
-        return if (row.status == ReportStatus.SENT.wire && txHash != null) {
-            ReportOutcome.Sent(txHash)
-        } else {
-            ReportOutcome.Failed("Laporan gagal dikirim. Periksa koneksi lalu coba lagi.")
+        return when {
+            row.status == ReportStatus.SENT.wire && txHash != null -> ReportOutcome.Sent(txHash)
+            row.status == ReportStatus.ALREADY_LISTED.wire -> ReportOutcome.AlreadyListed
+            else -> ReportOutcome.Failed("Laporan gagal dikirim. Periksa koneksi lalu coba lagi.")
         }
     }
 }
